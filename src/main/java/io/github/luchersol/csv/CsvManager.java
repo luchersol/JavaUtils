@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Scanner;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -21,6 +22,7 @@ public class CsvManager<T> {
     // =========================
     // STATE
     // =========================
+    private final Class<?> clazz;
     private final String path;
     private final List<T> values;
     private final List<Column> columns;
@@ -44,33 +46,22 @@ public class CsvManager<T> {
         this.path = path;
         this.values = values;
         this.columns = resolveColumns(clazz);
+        this.clazz = clazz;
     }
 
     // =========================
     // READ CSV
     // =========================
-    public static <T> CsvManager<T> readCsv(
-            String filePath,
-            Class<T> clazz,
-            String separator,
-            boolean skipHeader
-    ) throws Exception {
+    public static <T> CsvManager<T> readCsv(CsvManagerConfig<T> csvManagerConfig) throws Exception {
 
-        List<T> data = Files.lines(Paths.get(filePath))
-                .skip(skipHeader ? 1 : 0)
-                .map(line -> parseLine(line, clazz, separator))
+        List<T> data = Files.lines(Paths.get(csvManagerConfig.getPath()))
+                .skip(csvManagerConfig.isSkipHeader() ? 1 : 0)
+                .map(line -> parseLine(line, csvManagerConfig.getClazz(), csvManagerConfig.getSeparator()))
                 .toList();
 
-        return new CsvManager<>(filePath, data, clazz);
+        return new CsvManager<>(csvManagerConfig.getPath(), data, csvManagerConfig.getClass());
     }
 
-    public static <T> CsvManager<T> readCsv(String filePath, Class<T> clazz) throws Exception {
-        return readCsv(filePath, clazz, DEFAULT_SEPARATOR, true);
-    }
-
-    public static <T> CsvManager<T> readCsv(String filePath, Class<T> clazz, boolean skipHeader) throws Exception {
-        return readCsv(filePath, clazz, DEFAULT_SEPARATOR, skipHeader);
-    }
 
     // =========================
     // PARSER
@@ -116,13 +107,13 @@ public class CsvManager<T> {
     // =========================
     // WRITE CSV
     // =========================
-    public static <T> void writeCsv(String filePath, Collection<T> data, String sep) throws Exception {
+    public static <T> void writeCsv(String path, Collection<T> data, String sep) throws Exception {
         if (data.isEmpty()) return;
 
         Class<?> clazz = data.iterator().next().getClass();
         List<Column> cols = resolveColumns(clazz);
 
-        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(filePath))) {
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(path))) {
             for (T obj : data) {
                 bw.write(toLine(obj, cols, sep));
                 bw.newLine();
@@ -130,8 +121,45 @@ public class CsvManager<T> {
         }
     }
 
-    public static <T> void writeCsv(String filePath, Collection<T> data) throws Exception {
-        writeCsv(filePath, data, DEFAULT_SEPARATOR);
+    public static <T> void writeCsv(String path, Collection<T> data) throws Exception {
+        writeCsv(path, data, DEFAULT_SEPARATOR);
+    }
+
+    public void writeNewCsv(String path, String sep) throws Exception {
+        if (this.values.isEmpty()) return;
+
+        Class<?> clazz = this.values.iterator().next().getClass();
+        List<Column> cols = resolveColumns(clazz);
+
+        try (BufferedWriter bw = Files.newBufferedWriter(Paths.get(path))) {
+            for (T obj : this.values) {
+                bw.write(toLine(obj, cols, sep));
+                bw.newLine();
+            }
+        }
+    }
+
+    public void writeCsv(String path) throws Exception {
+        writeCsv(path, this.values, DEFAULT_SEPARATOR);
+    }
+
+    public void overwriteCsv(String separator) throws Exception {
+        try (Scanner scanner = new Scanner(System.in)) {
+            while (true) {
+                System.out.print("¿Quieres sobreescribir el archivo? [y/n] ");
+                String value = scanner.next().trim();
+                if("y".equals(value)) {
+                    writeCsv(this.path, this.values, separator);
+                    break;  
+                } else if ("n".equals(value)) {
+                    break;
+                }
+            }
+        }
+    }
+
+    public void overwriteCsv() throws Exception {
+        overwriteCsv(DEFAULT_SEPARATOR);
     }
 
     // =========================
@@ -249,6 +277,10 @@ public class CsvManager<T> {
         return values.size();
     }
 
+    public List<T> toList() {
+        return values;
+    }
+
     // =========================
     // SHOW TABLE
     // =========================
@@ -291,8 +323,7 @@ public class CsvManager<T> {
     // =========================
     // HELP
     // =========================
-    @SuppressWarnings("unchecked")
-    private Class<T> getClazz() {
-        return (Class<T>) values.get(0).getClass();
+    private Class<?> getClazz() {
+        return clazz;
     }
 }

@@ -2,13 +2,13 @@ package io.github.luchersol.csv;
 
 public class Producto {
     @CsvColumn(index = 0)
-    private int id;
+    public int id;
 
     @CsvColumn(index = 1)
-    private String nombre;
+    public String nombre;
 
     @CsvColumn(index = 2)
-    private double precio;
+    public double precio;
 
     @Override
     public String toString() {
